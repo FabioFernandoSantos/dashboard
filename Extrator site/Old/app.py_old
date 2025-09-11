@@ -1,0 +1,537 @@
+from dash import Dash, html, dcc, Input, Output, dash_table
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
+from dash.dash_table.Format import Format, Scheme, Symbol
+
+# URL do Google Sheets
+sheet_url = "https://docs.google.com/spreadsheets/d/1a0Az4vHSeZPPaLUg_MKZrD4DRPcqL4vcGABB9kpeY1c/export?format=csv"
+
+app = Dash(__name__)
+
+app.layout = html.Div([
+    html.Div([
+        html.Img(src='assets/logo.png', style={'height': '60px', 'marginRight': '20px'}),
+        html.H1("Monitor Financeiro - Contas a Pagar",
+                style={'textAlign': 'left', 'marginBottom': '0', 'color': '#d63384'})
+    ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'flex-start', 'marginBottom': '30px'}),
+
+    # KPIs principais
+    html.Div([
+        html.Div([
+            html.H3("Total Geral", style={'color': '#007bff', 'marginBottom': '5px'}),
+            html.H2(id='total-geral', style={'color': '#007bff', 'margin': '0'})
+        ], style={'backgroundColor': '#fff', 'padding': '10px', 'borderRadius': '10px',
+                  'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'textAlign': 'center', 'flex': '1'}),
+        
+        html.Div([
+            html.H3("Total Liquidado", style={'color': '#28a745', 'marginBottom': '5px'}),
+            html.H2(id='total-liquidado', style={'color': '#28a745', 'margin': '0'})
+        ], style={'backgroundColor': '#fff', 'padding': '10px', 'borderRadius': '10px',
+                  'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'textAlign': 'center', 'flex': '1'}),
+
+        html.Div([
+            html.H3("Total em Aberto", style={'color': '#dc3545', 'marginBottom': '5px'}),
+            html.H2(id='total-aberto', style={'color': '#dc3545', 'margin': '0'})
+        ], style={'backgroundColor': '#fff', 'padding': '10px', 'borderRadius': '10px',
+                  'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'textAlign': 'center', 'flex': '1'}),
+
+        html.Div([
+            html.H3("Contas Vencidas", style={'color': '#ffc107', 'marginBottom': '5px'}),
+            html.H2(id='contas-vencidas', style={'color': '#ffc107', 'margin': '0'})
+        ], style={'backgroundColor': '#fff', 'padding': '10px', 'borderRadius': '10px',
+                  'boxShadow': '0 2px 4px rgba(0,0,0,0.1)', 'textAlign': 'center', 'flex': '1'})
+    ], style={'display': 'flex', 'gap': '20px', 'marginBottom': '30px'}),
+
+    # Filtros (mantido igual)
+    html.Div([
+        html.Div([
+            html.Label("Tipo de Documento:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+            dcc.Dropdown(
+                id='dropdown-tipo-doc',
+                options=[],
+                value=None,
+                placeholder="Selecione o tipo de documento",
+                style={'width': '100%'}
+            )
+        ], style={'flex': '1', 'marginRight': '20px'}),
+
+        html.Div([
+            html.Label("Status do Pagamento:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+            dcc.Dropdown(
+                id='dropdown-status',
+                options=[
+                    {'label': 'Todos', 'value': 'todos'},
+                    {'label': 'Em Aberto', 'value': 'aberto'},
+                    {'label': 'Liquidado', 'value': 'liquidado'}
+                ],
+                value='todos',
+                style={'width': '100%'}
+            )
+        ], style={'flex': '1', 'marginRight': '20px'}),
+
+        html.Div([
+            html.Label("Mês de Vencimento:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+            dcc.Dropdown(
+                id='dropdown-mes',
+                options=[],
+                value=None,
+                placeholder="Selecione o mês",
+                style={'width': '100%'}
+            )
+        ], style={'flex': '1', 'marginRight': '20px'}),
+
+        html.Div([
+            html.Label("Fornecedor:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+            dcc.Dropdown(
+                id='dropdown-fornecedor',
+                options=[],
+                value=None,
+                placeholder="Selecione um fornecedor",
+                style={'width': '100%'}
+            )
+        ], style={'flex': '1', 'marginRight': '20px'}),
+
+        html.Div([
+            html.Label("Agrupamento:", style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+            dcc.Dropdown(
+                id='dropdown-agrupamento',
+                options=[
+                    {'label': 'Normal (todos os lançamentos)', 'value': 'normal'},
+                    {'label': 'Agrupado por dia (analítico)', 'value': 'diario'}
+                ],
+                value='normal',
+                style={'width': '100%'}
+            )
+        ], style={'flex': '1'})
+    ], style={'display': 'flex', 'marginBottom': '30px'}),
+
+    # Tabela de dados (mantido igual)
+    html.Div([
+        html.H3("📋 Detalhes das Contas", style={'marginTop': '0', 'marginBottom': '20px'}),
+        dash_table.DataTable(
+            id='tabela-contas',
+            columns=[],
+            data=[],
+            style_table={'overflowX': 'auto', 'overflowY': 'auto', 'maxHeight': '500px'},
+            style_header={
+                'backgroundColor': '#d63384',
+                'color': 'white',
+                'fontWeight': 'bold',
+                'textAlign': 'center',
+                'position': 'sticky',
+                'top': 0
+            },
+            style_cell={
+                'backgroundColor': '#f8f9fa',
+                'color': '#333333',
+                'textAlign': 'center',
+                'padding': '8px',
+                'fontSize': '12px',
+                'border': '1px solid #dee2e6'
+            },
+            style_data_conditional=[
+                {
+                    'if': {'filter_query': '{Saldo em Aberto} > 0'},
+                    'backgroundColor': '#fff3cd',
+                    'color': 'black',
+                },
+                {
+                    'if': {'filter_query': '{Data} contains "Total"'},
+                    'backgroundColor': '#d63384',
+                    'color': 'white',
+                    'fontWeight': 'bold'
+                },
+                {
+                    'if': {'column_id': 'Data', 'filter_query': '{Data} contains "Total"'},
+                    'textAlign': 'left'
+                },
+                {
+                    'if': {'column_id': 'Nome Fantasia Agente'},
+                    'textAlign': 'left'
+                },
+                {
+                    'if': {'column_id': 'Complemento'},
+                    'textAlign': 'left'
+                },
+                {
+                    'if': {
+                        'column_id': 'Tipo Doc.',
+                        'filter_query': '{Tipo Doc.} = "PREV"'
+                    },
+                    'backgroundColor': '#ffb6c1',
+                    'color': 'black'
+                },
+                {
+                    'if': {
+                        'column_id': 'Tipo Doc.',
+                        'filter_query': '{Tipo Doc.} = "PREVPDC"'
+                    },
+                    'backgroundColor': '#90ee90',
+                    'color': 'black'
+                }
+            ],
+            page_action='none',
+            sort_action='native',
+            filter_action='native',
+            fixed_rows={'headers': True}
+        )
+    ], style={'marginBottom': '30px'}),
+
+    # Gráficos (mantido igual)
+    html.Div([
+        html.Div([
+            dcc.Graph(id='grafico-vencimentos')
+        ], style={'width': '50%', 'display': 'inline-block'}),
+
+        html.Div([
+            dcc.Graph(id='grafico-tipos-documento')
+        ], style={'width': '50%', 'display': 'inline-block'})
+    ], style={'marginBottom': '20px'}),
+
+    html.Div([
+        dcc.Graph(id='grafico-fornecedores')
+    ]),
+
+    dcc.Interval(
+        id='intervalo-atualizacao',
+        interval=60*1000,
+        n_intervals=0
+    )
+], style={'maxWidth': '1200px', 'margin': 'auto', 'padding': '20px'})
+
+# ----------------------------
+# Funções utilitárias atualizadas
+# ----------------------------
+def format_brl(valor):
+    """Formata número float em R$ com vírgula como decimal."""
+    try:
+        return f"R$ {float(valor):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    except:
+        return "R$ 0,00"
+
+def carregar_dados():
+    """Carrega e processa os dados das contas a pagar com tratamento robusto para o mês 9"""
+    try:
+        df = pd.read_csv(sheet_url)
+
+        # Limpeza e normalização
+        if 'Tipo Doc.' in df.columns:
+            df['Tipo Doc.'] = df['Tipo Doc.'].astype(str).str.strip()
+
+        # Conversão robusta de valores monetários
+        for col in ['Retenção IR', 'Líquido', 'Saldo em Aberto']:
+            if col in df.columns:
+                df[col] = (
+                    df[col]
+                    .astype(str)
+                    .str.replace(r'[^\d,-]', '', regex=True)  # Remove tudo exceto dígitos, - e ,
+                    .str.replace('.', '', regex=False)        # Remove separador de milhares
+                    .str.replace(',', '.', regex=False)       # Substitui vírgula decimal por ponto
+                    .replace('', '0')                         # Substitui strings vazias por 0
+                )
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+        # Conversão robusta de datas
+        if 'Prorrogado' in df.columns:
+            # Tentar múltiplos formatos de data
+            df['Prorrogado'] = pd.to_datetime(
+                df['Prorrogado'],
+                dayfirst=True,
+                errors='coerce'
+            )
+            
+            # Criar coluna de mês no formato 'YYYY-MM'
+            df['Mes'] = df['Prorrogado'].dt.to_period('M').astype(str)
+            
+            # Criar coluna de mês numérico para comparações
+            df['Mes_Num'] = df['Prorrogado'].dt.month
+
+        # Criar coluna de status
+        if 'Saldo em Aberto' in df.columns:
+            df['Status'] = df['Saldo em Aberto'].apply(
+                lambda x: 'Liquidado' if float(x) == 0 else 'Em Aberto')
+
+        # Verificar contas vencidas
+        hoje = datetime.now().date()
+        if 'Prorrogado' in df.columns:
+            df['Vencido'] = df['Prorrogado'].dt.date < hoje
+
+        return df
+
+    except Exception as e:
+        print(f"Erro ao carregar dados: {e}")
+        return pd.DataFrame()
+
+# ----------------------------
+# Callbacks atualizados
+# ----------------------------
+@app.callback(
+    Output('dropdown-tipo-doc', 'options'),
+    Output('dropdown-fornecedor', 'options'),
+    Output('dropdown-mes', 'options'),
+    Input('intervalo-atualizacao', 'n_intervals')
+)
+def atualizar_opcoes(n):
+    df = carregar_dados()
+
+    if df.empty:
+        return [], [], []
+
+    # Tipos de documento
+    if 'Tipo Doc.' in df.columns:
+        tipos = sorted(df['Tipo Doc.'].dropna().unique())
+        tipos_doc = [{'label': 'Todos', 'value': 'todos'}] + [{'label': t, 'value': t} for t in tipos]
+    else:
+        tipos_doc = [{'label': 'Todos', 'value': 'todos'}]
+
+    # Fornecedores
+    if 'Nome Fantasia Agente' in df.columns:
+        forn = sorted(df['Nome Fantasia Agente'].dropna().unique())
+        fornecedores = [{'label': 'Todos', 'value': 'todos'}] + [{'label': f, 'value': f} for f in forn]
+    else:
+        fornecedores = [{'label': 'Todos', 'value': 'todos'}]
+
+    # Meses - garantindo que o mês 9 aparece corretamente
+    if 'Mes' in df.columns:
+        meses = sorted(df['Mes'].dropna().unique(), key=lambda x: pd.to_datetime(x))
+        meses_opt = [{'label': 'Todos', 'value': 'todos'}] + [{'label': m, 'value': m} for m in meses]
+    else:
+        meses_opt = [{'label': 'Todos', 'value': 'todos'}]
+
+    return tipos_doc, fornecedores, meses_opt
+
+@app.callback(
+    Output('total-liquidado', 'children'),
+    Output('total-aberto', 'children'),
+    Output('contas-vencidas', 'children'),
+    Output('total-geral', 'children'),
+    Input('dropdown-tipo-doc', 'value'),
+    Input('dropdown-status', 'value'),
+    Input('dropdown-fornecedor', 'value'),
+    Input('dropdown-mes', 'value'),
+    Input('intervalo-atualizacao', 'n_intervals')
+)
+def atualizar_kpis(tipo_doc, status, fornecedor, mes, n):
+    df = carregar_dados()
+
+    if df.empty:
+        return "R$ 0,00", "R$ 0,00", "0", "R$ 0,00"
+
+    df_filtrado = df.copy()
+
+    # Aplicar filtros
+    if tipo_doc and tipo_doc != 'todos' and 'Tipo Doc.' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Tipo Doc.'] == tipo_doc]
+
+    if status and status != 'todos' and 'Saldo em Aberto' in df_filtrado.columns:
+        if status == 'aberto':
+            df_filtrado = df_filtrado[df_filtrado['Saldo em Aberto'] > 0]
+        elif status == 'liquidado':
+            df_filtrado = df_filtrado[df_filtrado['Saldo em Aberto'] == 0]
+
+    if fornecedor and fornecedor != 'todos' and 'Nome Fantasia Agente' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Nome Fantasia Agente'] == fornecedor]
+
+    if mes and mes != 'todos' and 'Mes' in df_filtrado.columns:
+        # Filtro robusto para o mês
+        df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+
+    # Cálculo dos KPIs
+    total_aberto = 0
+    total_liquidado = 0
+    total_geral = 0
+    contas_vencidas = 0
+
+    if 'Líquido' in df_filtrado.columns:
+        total_geral = df_filtrado['Líquido'].sum()
+        
+        if 'Saldo em Aberto' in df_filtrado.columns:
+            # Total Liquidado (Saldo em Aberto == 0)
+            total_liquidado = df_filtrado.loc[df_filtrado['Saldo em Aberto'] == 0, 'Líquido'].sum()
+            
+            # Total em Aberto
+            total_aberto = df_filtrado.loc[df_filtrado['Saldo em Aberto'] > 0, 'Saldo em Aberto'].sum()
+            
+            # Contas vencidas
+            if 'Vencido' in df_filtrado.columns:
+                contas_vencidas = len(df_filtrado[(df_filtrado['Vencido'] == True) & 
+                                                (df_filtrado['Saldo em Aberto'] > 0)])
+
+    return (
+        format_brl(total_liquidado),
+        format_brl(total_aberto),
+        str(contas_vencidas),
+        format_brl(total_geral)
+    )
+
+# Callback para gráficos e tabela (mantido igual)
+@app.callback(
+    Output('grafico-vencimentos', 'figure'),
+    Output('grafico-tipos-documento', 'figure'),
+    Output('grafico-fornecedores', 'figure'),
+    Output('tabela-contas', 'columns'),
+    Output('tabela-contas', 'data'),
+    Input('dropdown-tipo-doc', 'value'),
+    Input('dropdown-status', 'value'),
+    Input('dropdown-fornecedor', 'value'),
+    Input('dropdown-agrupamento', 'value'),
+    Input('dropdown-mes', 'value'),
+    Input('intervalo-atualizacao', 'n_intervals')
+)
+def atualizar_graficos_e_tabela(tipo_doc, status, fornecedor, agrupamento, mes, n):
+    df = carregar_dados()
+    if df.empty:
+        empty_fig = go.Figure()
+        return empty_fig, empty_fig, empty_fig, [], []
+
+    df_filtrado = df.copy()
+
+    # Aplicar filtros (igual ao callback anterior)
+    if tipo_doc and tipo_doc != 'todos' and 'Tipo Doc.' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Tipo Doc.'] == tipo_doc]
+
+    if status and status != 'todos' and 'Saldo em Aberto' in df_filtrado.columns:
+        if status == 'aberto':
+            df_filtrado = df_filtrado[df_filtrado['Saldo em Aberto'] > 0]
+        elif status == 'liquidado':
+            df_filtrado = df_filtrado[df_filtrado['Saldo em Aberto'] == 0]
+
+    if fornecedor and fornecedor != 'todos' and 'Nome Fantasia Agente' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Nome Fantasia Agente'] == fornecedor]
+
+    if mes and mes != 'todos' and 'Mes' in df_filtrado.columns:
+        df_filtrado = df_filtrado[df_filtrado['Mes'] == mes]
+
+    # Gráficos (código mantido igual)
+    fig_vencimentos = go.Figure()
+    if not df_filtrado.empty and 'Prorrogado' in df_filtrado.columns and 'Saldo em Aberto' in df_filtrado.columns:
+        df_month = df_filtrado.dropna(subset=['Prorrogado']).copy()
+        if not df_month.empty:
+            df_month['Mes_Vencimento'] = df_month['Prorrogado'].dt.to_period('M').astype(str)
+            venc_por_mes = df_month.groupby('Mes_Vencimento')['Saldo em Aberto'].sum().reset_index()
+            fig_vencimentos = px.line(
+                venc_por_mes,
+                x='Mes_Vencimento',
+                y='Saldo em Aberto',
+                title='Vencimentos por Mês',
+                labels={'Saldo em Aberto': 'Valor (R$)', 'Mes_Vencimento': 'Mês'}
+            )
+    fig_vencimentos.update_layout(title_x=0.5)
+
+    fig_tipos = go.Figure()
+    if not df_filtrado.empty and 'Tipo Doc.' in df_filtrado.columns:
+        tipos_count = df_filtrado['Tipo Doc.'].value_counts().reset_index()
+        tipos_count.columns = ['Tipo Doc.', 'count']
+        fig_tipos = px.pie(
+            tipos_count,
+            values='count',
+            names='Tipo Doc.',
+            title='Distribuição por Tipo de Documento'
+        )
+    fig_tipos.update_layout(title_x=0.5)
+
+    fig_fornecedores = go.Figure()
+    if not df_filtrado.empty and 'Nome Fantasia Agente' in df_filtrado.columns and 'Saldo em Aberto' in df_filtrado.columns:
+        forn_valores = df_filtrado.groupby('Nome Fantasia Agente', as_index=False)['Saldo em Aberto'].sum()
+        forn_valores = forn_valores.nlargest(10, 'Saldo em Aberto')
+        fig_fornecedores = px.bar(
+            forn_valores,
+            x='Saldo em Aberto',
+            y='Nome Fantasia Agente',
+            orientation='h',
+            title='Top 10 Fornecedores por Valor em Aberto'
+        )
+    fig_fornecedores.update_layout(title_x=0.5, yaxis={'categoryorder': 'total ascending'})
+
+    # Tabela (código mantido igual)
+    if agrupamento == 'diario' and 'Prorrogado' in df_filtrado.columns:
+        df_aux = df_filtrado.copy()
+        df_aux = df_aux.sort_values(['Prorrogado', 'Líquido'], ascending=[True, False])
+        col_order = ['Data', 'Nome Fantasia Agente', 'Tipo Doc.', 'Número Doc.', 'AP', 'Líquido', 'Saldo em Aberto', 'Status', 'Complemento']
+        todas_as_linhas = []
+        df_aux['Data_fmt'] = df_aux['Prorrogado'].dt.strftime('%d/%m/%Y')
+
+        for data_str in df_aux['Data_fmt'].dropna().unique():
+            lancamentos_dia = df_aux[df_aux['Data_fmt'] == data_str].copy()
+            linha_data = pd.DataFrame([{
+                'Data': f"Data: {data_str}",
+                'Nome Fantasia Agente': None,
+                'Tipo Doc.': None,
+                'Número Doc.': None,
+                'AP': None,
+                'Líquido': None,
+                'Saldo em Aberto': None,
+                'Status': None,
+                'Complemento': None
+            }])
+
+            lanc = lancamentos_dia[['Data_fmt', 'Nome Fantasia Agente', 'Tipo Doc.', 'Número Doc.', 'AP', 'Líquido', 'Saldo em Aberto', 'Status', 'Complemento']].copy()
+            lanc = lanc.rename(columns={'Data_fmt': 'Data'})
+
+            total_liq = lancamentos_dia['Líquido'].sum(min_count=1)
+            total_saldo = lancamentos_dia['Saldo em Aberto'].sum(min_count=1)
+            linha_total = pd.DataFrame([{
+                'Data': f"Total do dia {data_str}",
+                'Nome Fantasia Agente': None,
+                'Tipo Doc.': None,
+                'Número Doc.': None,
+                'AP': None,
+                'Líquido': total_liq,
+                'Saldo em Aberto': total_saldo,
+                'Status': None,
+                'Complemento': None
+            }])
+
+            linha_data = linha_data[[c for c in col_order if c in linha_data.columns]]
+            lanc = lanc[[c for c in col_order if c in lanc.columns]]
+            linha_total = linha_total[[c for c in col_order if c in linha_total.columns]]
+
+            todas_as_linhas.append(linha_data)
+            todas_as_linhas.append(lanc)
+            todas_as_linhas.append(linha_total)
+
+        if todas_as_linhas:
+            df_tabela = pd.concat(todas_as_linhas, ignore_index=True, sort=False)
+            final_cols = [c for c in col_order if c in df_tabela.columns]
+            df_tabela = df_tabela[final_cols]
+        else:
+            df_tabela = pd.DataFrame(columns=[c for c in col_order])
+    else:
+        colunas_exibir = ['Prorrogado', 'Nome Fantasia Agente', 'Tipo Doc.', 'Número Doc.', 'AP', 'Líquido', 'Saldo em Aberto', 'Status', 'Complemento']
+        colunas_disponiveis = [col for col in colunas_exibir if col in df_filtrado.columns]
+        df_tabela = df_filtrado[colunas_disponiveis].copy()
+
+        if 'Prorrogado' in df_tabela.columns:
+            df_tabela['Prorrogado'] = df_tabela['Prorrogado'].dt.strftime('%d/%m/%Y')
+            cols = df_tabela.columns.tolist()
+            idx = cols.index('Prorrogado')
+            cols[idx] = 'Data'
+            df_tabela.columns = cols
+
+    if 'Tipo Doc.' in df_tabela.columns:
+        df_tabela['Tipo Doc.'] = df_tabela['Tipo Doc.'].astype(str).str.strip()
+
+    columns = [{"name": i, "id": i} for i in df_tabela.columns]
+
+    money_cols = ['Líquido', 'Saldo em Aberto']
+    for col in columns:
+        if col['id'] in money_cols:
+            col['type'] = 'numeric'
+            col['format'] = Format(
+                scheme=Scheme.fixed,
+                precision=2,
+                group=True,
+                group_delimiter='.',
+                decimal_delimiter=',',
+                symbol=Symbol.yes,
+                symbol_prefix='R$ '
+            )
+
+    data = df_tabela.to_dict('records')
+
+    return fig_vencimentos, fig_tipos, fig_fornecedores, columns, data
+
+if __name__ == '__main__':
+    app.run(debug=True)
