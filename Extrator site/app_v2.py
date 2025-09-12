@@ -685,44 +685,41 @@ def atualizar_total_liquidado_percent(mes, tipo_doc, status, fornecedor, json_da
 
 @app.callback(
     Output('contas-vencidas-delta', 'children'),
-    Input('dropdown-mes', 'value'),
-    Input('dropdown-tipo-doc', 'value'),
-    Input('dropdown-status', 'value'),
-    Input('dropdown-fornecedor', 'value'),
-    Input('store-dados', 'data')
+    Input('store-dados', 'data'),
+    Input('dropdown-mes', 'value')
 )
-def atualizar_contas_vencidas_percent(mes, tipo_doc, status, fornecedor, json_data):
-    """Calcula o percentual de contas vencidas (por contagem) no período selecionado."""
+def atualizar_contas_vencidas_delta(json_data, mes):
+    """Exibe o número de documentos vencidos de meses anteriores."""
     df = pd.read_json(io.StringIO(json_data), orient='split') if json_data else pd.DataFrame()
-    if df.empty or 'Prorrogado' not in df.columns:
+    if df.empty or 'Prorrogado' not in df.columns or 'Saldo em Aberto' not in df.columns:
         return ''
 
-    mes_sel = mes if mes and mes != 'todos' else datetime.now().strftime('%Y-%m')
-    df['Mes'] = pd.to_datetime(df['Prorrogado']).dt.to_period('M').astype(str)
+    # Garante que 'Prorrogado' é datetime
+    df['Prorrogado'] = pd.to_datetime(df['Prorrogado'], errors='coerce')
 
-    df_fil = filtrar_dataframe(df, tipo_doc, status, fornecedor, mes_sel)
+    # Define o primeiro dia do mês atual
+    hoje = datetime.now()
+    primeiro_dia_mes_atual = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    total_count = len(df_fil)
-    vencidas_count = len(df_fil[df_fil['Vencido'] == True]) if 'Vencido' in df_fil.columns else 0
+    # Filtra documentos de meses anteriores que ainda estão em aberto
+    df_vencidos_anterior = df[
+        (df['Prorrogado'] < primeiro_dia_mes_atual) &
+        (df['Saldo em Aberto'] > 0)
+    ]
+    
+    num_vencidos_anterior = len(df_vencidos_anterior)
 
-    if total_count == 0:
-        perc = 0
-    else:
-        perc = (vencidas_count / total_count) * 100
-
-    perc_str = f"{perc:.1f}%"
-
-    # emoji indicador: baixo/medio/alto
-    if perc == 0:
-        icon = '▫️'
-    elif perc < 20:
-        icon = '✅'
-    elif perc < 50:
+    if num_vencidos_anterior > 0:
         icon = '⚠️'
+        text = f"{num_vencidos_anterior} - Doc(s) Vencido(s) em Meses Anteriores"
+        color = "#ff6207"  # Laranja
     else:
-        icon = '❗'
-
-    # Nome do mês em português
+        icon = '✅'
+        text = "Nenhum doc vencido"
+        color = '#28a745'  # Verde
+        
+    # Determinar o nome do mês selecionado
+    mes_sel = mes if mes and mes != 'todos' else datetime.now().strftime('%Y-%m')
     meses_pt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
     try:
         mes_dt = pd.to_datetime(mes_sel)
@@ -733,9 +730,8 @@ def atualizar_contas_vencidas_percent(mes, tipo_doc, status, fornecedor, json_da
     bloco = html.Div([
         html.Div(f"Mês Atual: {mes_nome_pt}", style={'fontSize': '12px', 'color': '#666', 'marginBottom': '6px'}),
         html.Div([
-            html.Span(icon, style={'marginRight': '6px', 'fontSize': '12px', 'lineHeight': '1'}),
-            html.Span(perc_str, style={'fontWeight': '700', 'color': '#ffc107', 'marginRight': '8px'}),
-            html.Span('Percentual vencido', style={'fontSize': '11px', 'color': '#666', 'alignSelf': 'center'})
+            html.Span(icon, style={'marginRight': '8px', 'fontSize': '14px'}),
+            html.Span(text, style={'fontWeight': '700', 'color': color})
         ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'gap': '6px'})
     ], style={'textAlign': 'center'})
 
