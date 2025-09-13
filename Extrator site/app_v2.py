@@ -711,7 +711,7 @@ def atualizar_contas_vencidas_delta(json_data, mes):
 
     if num_vencidos_anterior > 0:
         icon = '⚠️'
-        text = f"{num_vencidos_anterior} - Doc(s) Vencido(s) em Meses Anteriores"
+        text = f"{num_vencidos_anterior} - Vencido(s) em Meses Anteriores"
         color = "#ff6207"  # Laranja
     else:
         icon = '✅'
