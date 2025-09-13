@@ -707,11 +707,16 @@ def atualizar_contas_vencidas_delta(json_data, mes):
     ]
     
     num_vencidos_anterior = len(df_vencidos_anterior)
+    tooltip_text = ''
 
     if num_vencidos_anterior > 0:
         icon = '⚠️'
         text = f"{num_vencidos_anterior} - Vencido(s) em Meses Anteriores"
         color = "#ff6207"  # Laranja
+        
+        # Get the months of the overdue documents
+        meses_vencidos = df_vencidos_anterior['Prorrogado'].dt.strftime('%Y-%m').unique()
+        tooltip_text = '⚠️Meses com docs vencidos: ' + ', '.join(sorted(meses_vencidos))
     else:
         icon = '✅'
         text = "Nenhum doc vencido"
@@ -730,7 +735,7 @@ def atualizar_contas_vencidas_delta(json_data, mes):
         html.Div(f"Mês Atual: {mes_nome_pt}", style={'fontSize': '12px', 'color': '#666', 'marginBottom': '6px'}),
         html.Div([
             html.Span(icon, style={'marginRight': '8px', 'fontSize': '14px'}),
-            html.Span(text, style={'fontWeight': '700', 'color': color})
+            html.Span(text, style={'fontWeight': '700', 'color': color}, title=tooltip_text)
         ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center', 'gap': '6px'})
     ], style={'textAlign': 'center'})
 
