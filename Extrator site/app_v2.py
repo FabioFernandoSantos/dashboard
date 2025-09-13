@@ -124,9 +124,8 @@ app.layout = html.Div([
             dcc.Dropdown(
                 id='dropdown-agrupamento',
                 options=[
-                    {'label': 'Normal (todos os lançamentos)', 'value': 'normal'},
-                    {'label': 'Agrupado por dia (analítico)', 'value': 'diario'},
-                    {'label': 'Agrupado por dia e filial', 'value': 'dia_filial'}
+                    {'label': 'Sem Agrupamento (todos os lançamentos)', 'value': 'normal'},
+                    {'label': 'Agrupado por Dia e Filial', 'value': 'dia_filial'}
                 ],
                 value='dia_filial',
                 clearable=False,
