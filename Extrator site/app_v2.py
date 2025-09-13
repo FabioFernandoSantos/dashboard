@@ -421,10 +421,10 @@ def atualizar_opcoes(json_data):
         meses_dados.add(mes_corrente_str)
         
         meses_ordenados = sorted(list(meses_dados), key=lambda x: pd.to_datetime(x))
-        meses_opt = [{'label': 'Todos', 'value': 'todos'}] + [{'label': m, 'value': m} for m in meses_ordenados]
+        meses_opt = [{'label': m, 'value': m} for m in meses_ordenados]
     else:
-        meses_opt = [{'label': 'Todos', 'value': 'todos'}]
         mes_corrente_str = datetime.now().strftime("%Y-%m")
+        meses_opt = [{'label': mes_corrente_str, 'value': mes_corrente_str}]
 
     return tipos_doc, fornecedores, meses_opt
 
@@ -593,13 +593,13 @@ def atualizar_total_aberto_percent(mes, tipo_doc, status, fornecedor, json_data)
     # escolher uma figurinha (emoji) simples para colocar antes do percentual
     # emojis alterados para teste: 0%, bom, atenção, crítico
     if perc == 0:
-        icon = '▫️'
+        icon = '🏆'
     elif perc < 20:
         icon = '✅'
     elif perc < 50:
         icon = '⚠️'
     else:
-        icon = '❗'
+        icon = '💰'
 
     # Nome do mês em português, similar ao cartão Total Geral
     meses_pt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -654,7 +654,7 @@ def atualizar_total_liquidado_percent(mes, tipo_doc, status, fornecedor, json_da
 
     # emojis/símbolos: crítico, atenção, bom, perfeito. Alto % é bom.
     if perc < 50:
-        icon = '❗'  # Crítico
+        icon = '💰'  # Crítico
     elif perc < 80:
         icon = '⚠️'  # Atenção
     elif perc < 100:
