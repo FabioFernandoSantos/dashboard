@@ -309,12 +309,16 @@ app.layout = html.Div([
     # Store para armazenar os dados carregados e evitar recarregamentos
     dcc.Store(id='store-dados'),
 
-    # Botão de impressão da página
+    # Botões de impressão
     html.Div([
+        html.Button('Imprimir Tabela', id='btn-print-table', n_clicks=0,
+                    style={'backgroundColor': '#28a745', 'color': 'white', 'border': 'none',
+                           'padding': '10px 16px', 'borderRadius': '6px', 'cursor': 'pointer', 'marginRight': '10px'}),
         html.Button('Imprimir Página', id='btn-print', n_clicks=0,
                     style={'backgroundColor': '#007bff', 'color': 'white', 'border': 'none',
                            'padding': '10px 16px', 'borderRadius': '6px', 'cursor': 'pointer'}),
-        html.Div(id='print-output', style={'display': 'none'})
+        html.Div(id='print-output', style={'display': 'none'}),
+        html.Div(id='print-table-output', style={'display': 'none'})
     ], style={'textAlign': 'right', 'marginTop': '20px'})
 ], style={'width': '100%', 'margin': '0', 'padding': '12px 24px', 'boxSizing': 'border-box'})
 
@@ -1104,6 +1108,39 @@ app.clientside_callback(
     "function(n_clicks){ if(n_clicks>0){ window.print(); } return ''; }",
     Output('print-output', 'children'),
     Input('btn-print', 'n_clicks')
+)
+
+app.clientside_callback(
+    """function(n_clicks){
+        if(n_clicks>0){
+            var table = document.getElementById('tabela-contas');
+            if (table) {
+                // Find the actual table container within the dash_table.DataTable component
+                var tableContainer = table.querySelector('.dash-spreadsheet-container');
+                if (tableContainer) {
+                    var printWindow = window.open('', '', 'height=600,width=800');
+                    printWindow.document.write('<html><head><title>Tabela de Contas</title>');
+                    // Basic styling for print - you might want to include your app\'s CSS here
+                    printWindow.document.write('<style>');
+                    printWindow.document.write('body { font-family: sans-serif; }');
+                    printWindow.document.write('table { width: 100%; border-collapse: collapse; }');
+                    printWindow.document.write('th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }');
+                    printWindow.document.write('th { background-color: #f2f2f2; }');
+                    printWindow.document.write('</style>');
+                    printWindow.document.write('</head><body>');
+                    printWindow.document.write('<h1>Tabela de Contas</h1>');
+                    printWindow.document.write(tableContainer.outerHTML);
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.print();
+                    // printWindow.close(); // Closing immediately might prevent printing in some browsers
+                }
+            }
+        }
+        return '';
+    }""",
+    Output('print-table-output', 'children'),
+    Input('btn-print-table', 'n_clicks')
 )
 
 # Rodar o app
