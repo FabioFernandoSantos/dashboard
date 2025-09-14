@@ -716,7 +716,7 @@ def atualizar_contas_vencidas_delta(json_data, mes):
         
         # Get the months of the overdue documents
         meses_vencidos = df_vencidos_anterior['Prorrogado'].dt.strftime('%Y-%m').unique()
-        tooltip_text = 'Meses com vencimentos: ' + ', '.join(sorted(meses_vencidos))
+        tooltip_text = 'Meses com docs vencidos: ' + ', '.join(sorted(meses_vencidos))
     else:
         icon = '✅'
         text = "Nenhum doc vencido"
