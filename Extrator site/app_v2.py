@@ -309,8 +309,11 @@ app.layout = html.Div([
     # Store para armazenar os dados carregados e evitar recarregamentos
     dcc.Store(id='store-dados'),
 
-    # Botões de impressão
+    # Botões de impressão e exportação
     html.Div([
+        html.Button('Exportar para Excel', id='btn-export-excel', n_clicks=0,
+                    style={'backgroundColor': '#17a2b8', 'color': 'white', 'border': 'none',
+                           'padding': '10px 16px', 'borderRadius': '6px', 'cursor': 'pointer', 'marginRight': '10px'}),
         html.Button('Imprimir Tabela', id='btn-print-table', n_clicks=0,
                     style={'backgroundColor': '#28a745', 'color': 'white', 'border': 'none',
                            'padding': '10px 16px', 'borderRadius': '6px', 'cursor': 'pointer', 'marginRight': '10px'}),
@@ -318,7 +321,9 @@ app.layout = html.Div([
                     style={'backgroundColor': '#007bff', 'color': 'white', 'border': 'none',
                            'padding': '10px 16px', 'borderRadius': '6px', 'cursor': 'pointer'}),
         html.Div(id='print-output', style={'display': 'none'}),
-        html.Div(id='print-table-output', style={'display': 'none'})
+        html.Div(id='print-table-output', style={'display': 'none'}),
+        html.Div(id='export-excel-output', style={'display': 'none'}),
+        dcc.Download(id='download-excel')
     ], style={'textAlign': 'right', 'marginTop': '20px'})
 ], style={'width': '100%', 'margin': '0', 'padding': '12px 24px', 'boxSizing': 'border-box'})
 
@@ -564,6 +569,49 @@ def atualizar_total_geral_delta(mes, tipo_doc, status, fornecedor, json_data):
 
     return texto
 
+
+@app.callback(
+    Output('download-excel', 'data'),
+    Input('btn-export-excel', 'n_clicks'),
+    Input('tabela-contas', 'data'),
+    Input('dropdown-tipo-doc', 'value'),
+    Input('dropdown-status', 'value'),
+    Input('dropdown-fornecedor', 'value'),
+    Input('dropdown-mes', 'value'),
+    prevent_initial_call=True
+)
+def exportar_para_excel(n_clicks, dados_tabela, tipo_doc, status, fornecedor, mes):
+    """Exporta os dados da tabela filtrada para um arquivo Excel."""
+    if n_clicks is None or n_clicks == 0 or not dados_tabela:
+        return None
+    
+    # Criar DataFrame a partir dos dados da tabela
+    df_export = pd.DataFrame(dados_tabela)
+    
+    # Gerar nome do arquivo com data e hora atual
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filtros = []
+    if tipo_doc and tipo_doc != 'todos':
+        filtros.append(f"tipo_{tipo_doc}")
+    if status and status != 'todos':
+        filtros.append(f"status_{status}")
+    if fornecedor and fornecedor != 'todos':
+        filtros.append("fornecedor_filtrado")
+    if mes and mes != 'todos':
+        filtros.append(f"mes_{mes}")
+    
+    filtros_str = "_".join(filtros) if filtros else "completo"
+    filename = f"contas_a_pagar_{filtros_str}_{timestamp}.xlsx"
+    
+    # Criar arquivo Excel em memória usando pandas diretamente
+    output = io.BytesIO()
+    df_export.to_excel(output, sheet_name='Contas a Pagar', index=False)
+    
+    # Preparar para download
+    output.seek(0)
+    data = output.getvalue()
+    
+    return dcc.send_bytes(data, filename=filename)
 
 @app.callback(
     Output('total-aberto-delta', 'children'),
