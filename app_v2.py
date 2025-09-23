@@ -7,7 +7,7 @@ from datetime import datetime
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
 
 # URL do Google Sheets
-sheet_url = "https://docs.google.com/spreadsheets/d/19G1wYQUda-zjrtUMaKnksVhhnIujHr1UezcV5Z9IMAg/edit?usp=sharing"
+sheet_url = "https://docs.google.com/spreadsheets/d/19G1wYQUda-zjrtUMaKnksVhhnIujHr1UezcV5Z9IMAg/export?format=csv&gid=0"
 
 app = Dash(__name__)
 
@@ -340,7 +340,40 @@ def format_brl(valor):
 def carregar_dados():
     """Carrega e processa os dados das contas a pagar."""
     try:
-        df = pd.read_csv(sheet_url)
+        # Leitura robusta do CSV com tratamento de linhas inconsistentes
+        df = pd.read_csv(
+            sheet_url,
+            skiprows=3,           # Ignora as 3 primeiras linhas
+            on_bad_lines='skip',  # Pula linhas com problemas
+            engine='python',      # Usa o engine Python para melhor tratamento de erros
+            encoding='utf-8',     # Especifica encoding
+            sep=','               # Especifica separador
+        )
+        
+        # Verificar se o DataFrame foi carregado corretamente
+        if df.empty:
+            print("Aviso: DataFrame está vazio após o carregamento")
+            return pd.DataFrame()
+        
+        print(f"Dados carregados com sucesso: {len(df)} linhas, {len(df.columns)} colunas")
+        print(f"Colunas disponíveis: {list(df.columns)}")
+
+        # Filtrar dados: remover linhas a partir de "Total Geral" (inclusive)
+        if not df.empty and len(df.columns) > 0:
+            primeira_coluna = df.columns[0]
+            df[primeira_coluna] = df[primeira_coluna].astype(str)
+            
+            # Encontrar a primeira ocorrência de "Total Geral" (case insensitive)
+            total_geral_mask = df[primeira_coluna].str.contains('Total Geral', case=False, na=False)
+            total_geral_indices = df[total_geral_mask].index.tolist()
+            
+            if total_geral_indices:
+                # Pegar o primeiro índice onde aparece "Total Geral"
+                primeiro_total_geral = total_geral_indices[0]
+                # Filtrar o DataFrame para manter apenas as linhas antes de "Total Geral"
+                df = df.iloc[:primeiro_total_geral].copy()
+                print(f"Filtrado: removidas {len(df) - primeiro_total_geral} linhas a partir de 'Total Geral'")
+                print(f"Dados após filtro: {len(df)} linhas")
 
         # Limpeza e normalização
         if 'Tipo Doc.' in df.columns:
@@ -380,8 +413,32 @@ def carregar_dados():
 
         return df
 
+    except pd.errors.ParserError as e:
+        print(f"Erro de parsing CSV: {e}")
+        print("Tentando carregar com configurações alternativas...")
+        
+        # Tentativa alternativa com configurações mais flexíveis
+        try:
+            df = pd.read_csv(
+                sheet_url,
+                on_bad_lines='skip',
+                engine='python',
+                encoding='utf-8',
+                sep=',',
+                quotechar='"',
+                skipinitialspace=True,
+                error_bad_lines=False,
+                warn_bad_lines=True
+            )
+            print(f"Carregamento alternativo bem-sucedido: {len(df)} linhas")
+            return df
+        except Exception as e2:
+            print(f"Falha no carregamento alternativo: {e2}")
+            return pd.DataFrame()
+            
     except Exception as e:
-        print(f"Erro ao carregar dados: {e}")
+        print(f"Erro geral ao carregar dados: {e}")
+        print(f"Tipo do erro: {type(e).__name__}")
         return pd.DataFrame()
 
 # ----------------------------
@@ -771,7 +828,7 @@ def atualizar_contas_vencidas_delta(json_data, mes):
         tooltip_text = 'Meses com docs vencidos: ' + ', '.join(sorted(meses_vencidos))
     else:
         icon = '✅'
-        text = "Nenhum doc vencido"
+        text = "Nenhum doc vencido em meses ant."
         color = '#28a745'  # Verde
         
     # Determinar o nome do mês selecionado
@@ -1192,10 +1249,9 @@ app.clientside_callback(
 )
 
 # Rodar o app
-#if __name__ == '__main__':
- #   app.run(debug=True)
-
+# Configuração do servidor para deploy
 server = app.server  # necessário para o Render, ai favor não apagar.
 
-if __name__ == '__main__': # necessário para o Render, ai favor não apagar.
-    app.run_server(host="0.0.0.0", port=8050, debug=True) # necessário para o Render, ai favor não apagar.
+# Rodar o app
+if __name__ == '__main__':
+    app.run(debug=True)
