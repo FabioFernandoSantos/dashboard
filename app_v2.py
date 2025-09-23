@@ -7,7 +7,7 @@ from datetime import datetime
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
 
 # URL do Google Sheets
-sheet_url = "https://docs.google.com/spreadsheets/d/1a0Az4vHSeZPPaLUg_MKZrD4DRPcqL4vcGABB9kpeY1c/export?format=csv"
+sheet_url = "https://docs.google.com/spreadsheets/d/19G1wYQUda-zjrtUMaKnksVhhnIujHr1UezcV5Z9IMAg/edit?usp=sharing"
 
 app = Dash(__name__)
 
