@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
+import uuid
 
 # URL do Google Sheets
 sheet_url = "https://docs.google.com/spreadsheets/d/19G1wYQUda-zjrtUMaKnksVhhnIujHr1UezcV5Z9IMAg/export?format=csv&gid=0"
@@ -307,7 +308,10 @@ app.layout = html.Div([
     ),
     
     # Store para armazenar os dados carregados e evitar recarregamentos
-    dcc.Store(id='store-dados'),
+    dcc.Store(id='store-dados', storage_type='session'),
+    
+    # Store para armazenar o ID da sessão do usuário
+    dcc.Store(id='session-id', storage_type='session'),
 
     # Botões de impressão e exportação
     html.Div([
@@ -444,6 +448,18 @@ def carregar_dados():
 # ----------------------------
 # Callbacks
 # ----------------------------
+
+# Callback para inicializar session-id único para cada usuário
+@app.callback(
+    Output('session-id', 'data'),
+    Input('session-id', 'data')
+)
+def inicializar_session_id(session_data):
+    """Inicializa um ID único para cada sessão de usuário."""
+    if session_data is None:
+        return str(uuid.uuid4())
+    return session_data
+
 @app.callback(
     Output('store-dados', 'data'),
     Input('intervalo-atualizacao', 'n_intervals')
