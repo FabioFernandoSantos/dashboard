@@ -176,7 +176,7 @@ app.layout = html.Div([
                 {
                     'if': {'column_id': 'Nome Fantasia Agente'},
                     'textAlign': 'left',
-                    'minWidth': '200px', 'width': 'auto', 'maxWidth': '800px'
+                    'minWidth': '150px', 'width': 'auto', 'maxWidth': '200px'
                 },
                 {
                     'if': {'column_id': 'Tipo Doc.'},
@@ -184,11 +184,11 @@ app.layout = html.Div([
                 },
                 {
                     'if': {'column_id': 'Número Doc.'},
-                    'minWidth': '100px', 'width': '120px', 'maxWidth': '160px'
+                    'minWidth': '80px', 'width': '80px', 'maxWidth': '120px'
                 },
                 {
                     'if': {'column_id': 'AP'},
-                    'minWidth': '60px', 'width': '80px', 'maxWidth': '100px'
+                    'minWidth': '60px', 'width': '70px', 'maxWidth': '100px'
                 },
                 {
                     'if': {'column_id': 'Líquido'},
@@ -201,7 +201,7 @@ app.layout = html.Div([
                 {
                     'if': {'column_id': 'Complemento'},
                     'textAlign': 'left',
-                    'minWidth': '150px', 'width': 'auto', 'maxWidth': '600px'
+                    'minWidth': '150px', 'width': 'auto', 'maxWidth': '400px'
                 }
             ],
             style_data_conditional=[
