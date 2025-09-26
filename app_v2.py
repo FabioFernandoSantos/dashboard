@@ -293,7 +293,23 @@ app.layout = html.Div([
         ], style={'width': '50%', 'display': 'inline-block'}),
 
         html.Div([
-            dcc.Graph(id='grafico-tipos-documento')
+            html.Div([
+                html.H3("💰 PREV + PREVPDC em Aberto", style={'color': '#6f42c1', 'marginBottom': '10px', 'fontSize': '18px'}),
+                html.H2(id='card-prev-prevpdc', style={'color': '#6f42c1', 'margin': '0', 'fontSize': '28px', 'fontWeight': 'bold'}),
+                html.P("Documentos em aberto no mês atual", style={'color': '#6c757d', 'margin': '5px 0 0 0', 'fontSize': '14px'})
+            ], style={
+                'backgroundColor': '#fff', 
+                'padding': '20px', 
+                'borderRadius': '15px',
+                'boxShadow': '0 4px 8px rgba(0,0,0,0.1)', 
+                'textAlign': 'center', 
+                'height': '150px',
+                'display': 'flex',
+                'flexDirection': 'column',
+                'justifyContent': 'center',
+                'border': '2px solid #6f42c1',
+                'margin': '10px'
+            })
         ], style={'width': '50%', 'display': 'inline-block'})
     ], style={'marginBottom': '20px'}),
 
@@ -867,8 +883,39 @@ def atualizar_contas_vencidas_delta(json_data, mes):
     return bloco
 
 @app.callback(
+    Output('card-prev-prevpdc', 'children'),
+    Input('dropdown-mes', 'value'),
+    Input('store-dados', 'data')
+)
+def atualizar_card_prev_prevpdc(mes, json_data):
+    """Calcula o valor total dos documentos PREV e PREVPDC que estão em aberto no mês atual."""
+    df = pd.read_json(io.StringIO(json_data), orient='split') if json_data else pd.DataFrame()
+    if df.empty or 'Tipo Doc.' not in df.columns or 'Saldo em Aberto' not in df.columns or 'Prorrogado' not in df.columns:
+        return 'R$ 0,00'
+
+    # Usar o mês atual se nenhum mês foi selecionado
+    mes_atual = mes if mes and mes != 'todos' else datetime.now().strftime('%Y-%m')
+    
+    # Converter a coluna de data para datetime se necessário
+    df['Prorrogado'] = pd.to_datetime(df['Prorrogado'], errors='coerce')
+    df['Mes'] = df['Prorrogado'].dt.to_period('M').astype(str)
+    
+    # Filtrar por mês atual
+    df_mes_atual = df[df['Mes'] == mes_atual]
+    
+    # Filtrar apenas documentos PREV e PREVPDC que estão em aberto
+    df_prev_prevpdc = df_mes_atual[
+        (df_mes_atual['Tipo Doc.'].isin(['PREV', 'PREVPDC'])) & 
+        (df_mes_atual['Saldo em Aberto'] > 0)
+    ]
+    
+    # Calcular o total
+    total = df_prev_prevpdc['Saldo em Aberto'].sum() if not df_prev_prevpdc.empty else 0
+    
+    return format_brl(total)
+
+@app.callback(
     Output('grafico-vencimentos', 'figure'),
-    Output('grafico-tipos-documento', 'figure'),
     Output('grafico-fornecedores', 'figure'),
     Output('tabela-contas', 'columns'),
     Output('tabela-contas', 'data'),
@@ -940,17 +987,7 @@ def atualizar_graficos_e_tabela(tipo_doc, status, fornecedor, agrupamento, mes, 
             fig_vencimentos.update_layout(title_x=0.5, xaxis_title='Valor (R$)', yaxis_title='Dia', uniformtext_minsize=8)
             fig_vencimentos.update_xaxes(tickprefix='R$ ', tickformat=',.2f', automargin=True)
 
-    fig_tipos = go.Figure()
-    if not df_filtrado.empty and 'Tipo Doc.' in df_filtrado.columns:
-        tipos_count = df_filtrado['Tipo Doc.'].value_counts().reset_index()
-        tipos_count.columns = ['Tipo Doc.', 'count']
-        fig_tipos = px.pie(
-            tipos_count,
-            values='count',
-            names='Tipo Doc.',
-            title='Distribuição por Tipo de Documento'
-        )
-    fig_tipos.update_layout(title_x=0.5)
+
 
     fig_fornecedores = go.Figure()
     if not df_filtrado.empty and 'Nome Fantasia Agente' in df_filtrado.columns and 'Saldo em Aberto' in df_filtrado.columns:
@@ -1150,7 +1187,7 @@ def atualizar_graficos_e_tabela(tipo_doc, status, fornecedor, agrupamento, mes, 
 
     data = df_tabela.to_dict('records')
 
-    return fig_vencimentos, fig_tipos, fig_fornecedores, columns, data
+    return fig_vencimentos, fig_fornecedores, columns, data
 
 
 @app.callback(
