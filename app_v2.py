@@ -16,6 +16,77 @@ app = Dash(__name__)
 mes_corrente = datetime.now().strftime("%Y-%m")
 
 app.layout = html.Div([
+    # Bootstrap CSS
+    html.Link(
+        rel='stylesheet',
+        href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'
+    ),
+    
+    # Bootstrap JS
+    html.Script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'),
+    
+    # Sidebar
+    html.Div([
+        html.Div([
+            html.Span("☰", style={
+                'fontSize': '24px',
+                'color': '#fff',
+                'cursor': 'pointer',
+                'padding': '10px'
+            })
+        ], className='sidebar-toggle', style={
+            'position': 'absolute',
+            'top': '10px',
+            'left': '10px',
+            'backgroundColor': '#343a40',
+            'borderRadius': '5px',
+            'zIndex': '1050'
+        }),
+        
+        html.Div([
+            html.Div([
+                html.H5("Menu", className='text-white mb-3 mt-3'),
+                html.Ul([
+                    html.Li([
+                        html.A("Item de Menu 1", href="#", className='nav-link text-white')
+                    ], className='nav-item'),
+                    html.Li([
+                        html.A("Item de Menu 2", href="#", className='nav-link text-white')
+                    ], className='nav-item'),
+                    html.Li([
+                        html.A("Item de Menu 3", href="#", className='nav-link text-white')
+                    ], className='nav-item'),
+                    html.Li([
+                        html.A("Submenu", href="#", className='nav-link text-white', **{'data-bs-toggle': 'collapse', 'data-bs-target': '#submenu'}),
+                        html.Ul([
+                            html.Li([
+                                html.A("Subitem 1", href="#", className='nav-link text-white-50 ps-4')
+                            ], className='nav-item'),
+                            html.Li([
+                                html.A("Subitem 2", href="#", className='nav-link text-white-50 ps-4')
+                            ], className='nav-item'),
+                            html.Li([
+                                html.A("Subitem 3", href="#", className='nav-link text-white-50 ps-4')
+                            ], className='nav-item')
+                        ], className='collapse nav flex-column', id='submenu')
+                    ], className='nav-item')
+                ], className='nav flex-column')
+            ], className='p-3')
+        ], className='sidebar', id='sidebar', style={
+            'position': 'fixed',
+            'top': '0',
+            'left': '-250px',
+            'width': '250px',
+            'height': '100vh',
+            'backgroundColor': '#343a40',
+            'transition': 'left 0.3s ease',
+            'zIndex': '1040',
+            'overflowY': 'auto'
+        })
+    ]),
+    
+    # Main content wrapper
+    html.Div([
     html.Div([
         html.Img(src='assets/logo.png', style={'height': '60px', 'marginRight': '20px'}),
         html.H1("Monitor Financeiro - Contas a Pagar",
@@ -345,7 +416,14 @@ app.layout = html.Div([
         html.Div(id='export-excel-output', style={'display': 'none'}),
         dcc.Download(id='download-excel')
     ], style={'textAlign': 'right', 'marginTop': '20px'})
-], style={'width': '100%', 'margin': '0', 'padding': '12px 24px', 'boxSizing': 'border-box'})
+    ], id='main-content', style={
+        'width': '100%', 
+        'margin': '0', 
+        'padding': '12px 24px', 
+        'boxSizing': 'border-box',
+        'transition': 'margin-left 0.3s ease'
+    })
+])
 
 # ----------------------------
 # Funções utilitárias
